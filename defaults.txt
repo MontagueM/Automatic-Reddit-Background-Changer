@@ -3,6 +3,6 @@ TIME_SLEEP=30
 // To stop asking to use defaults at beginning
 STOP_DEFAULTS_MESSAGE=FALSE
 // List of subreddits to use, exclude /r/ and capitals do not matter. Seperate with comma ',' no spaces
-SUBREDDITS=imaginarylandscapes,imaginaryautumnscapes,imaginaryforests,imaginarycastles,imaginaryknights,imaginarylakes,imaginarymountains,imaginaryruins,imaginaryscholars,imaginaryhistory,imaginarysummerscapes,imaginarytamriel,imaginarytowers,imaginarytrees,imaginarywalls,imaginarywinterscapes,imaginaryworlds
+SUBREDDITS=wallpapers, wallpaper, imaginarylandscapes,imaginaryautumnscapes,imaginaryforests,imaginarycastles,imaginaryknights,imaginarylakes,imaginarymountains,imaginaryruins,imaginaryscholars,imaginaryhistory,imaginarysummerscapes,imaginarytamriel,imaginarytowers,imaginarytrees,imaginarywalls,imaginarywinterscapes,imaginaryworlds
 // TOP for top of all time or HOT for hot
 SORTING=HOT
