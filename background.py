@@ -29,7 +29,7 @@ class Background:
         self.image_content = None
         self.image_file_path = ""
 
-    def pull_image_from_url(self):
+    def get_image_from_url(self):
         """
         :return: the image content of the background
         """
@@ -43,37 +43,57 @@ class Background:
             return False
         return True
 
-    def save_image_to_file(self):
+    def save_image_to_file(self, directory=None):
         """
         Once we know we have the right image to set to the background we can save it to change bg.
         :return: the OS file path of the image
         """
+        if not self.image_content:
+            self.get_image_from_url()
         # We can't set this url to be constant as favourite images do not use this url
-        self.image_file_path = os.getcwd() + "/background.png"
+        if directory:
+            self.image_file_path = os.getcwd() + f"/{directory.replace('/', '')}/{self.site_url.split('/')[-1].split('.')[0]}.png"
+        else:
+            self.image_file_path = os.getcwd() + "/background.png"
         self.image_content.save(self.image_file_path)
-        #return self.image_file_path
 
-    def set_dimensions(self):
+    def get_dimensions(self):
+        if not self.image_content:
+            self.get_image_from_url()
         self.dimensions = self.image_content.size
 
-    def is_ratio_valid(self):
+    def is_ratio_invalid(self):
+        if not self.dimensions:
+            self.get_dimensions()
         width, height = self.dimensions
-        # Some arbritrary aspect ratio requirement that is < 16/9
-        if width / height > 10/7:
+        # Some arbritrary aspect ratio requirement that is < 16/9 but > 1/1
+        if width / height < 10/7:
             return True
         return False
 
     def add_favourite(self):
-        pass
+        try:
+            os.mkdir('Favourites')
+        except FileExistsError:
+            pass
+        self.save_image_to_file(directory='Favourites')
 
-    def is_image_duped(self):
+    def is_image_duped(self, past_urls):
         # we dont want to show duped images
-        pass
+        if self.site_url in past_urls:
+            return True
+        return False
 
     def change_background(self):
         """
         Uses in-built OS commands to change the background. Only works for Windows as of now.
         """
-        ctypes.windll.user32.SystemParametersInfoW(20, 0, self.image_file_path,
-                                                   3)  # Setting background for all four monitors
-        print("Changed background.\n")
+        try:
+            ctypes.windll.user32.SystemParametersInfoW(20, 0, self.image_file_path,
+                                                       3)  # Setting background for all four monitors
+        except Exception as e:
+            print(f'Exception {e}')
+            return False
+
+        print(f"Changed background to {self.site_url}.\n")
+        return True
