@@ -1,8 +1,7 @@
-import requests
-from bs4 import BeautifulSoup
 import background
 import random
 from threading import Timer
+import praw
 
 past_urls = []
 image_extensions = ['jpg', 'jpeg', 'png', 'bmp']
@@ -37,40 +36,30 @@ def try_ask_settings_msg(settings):
 
 def get_redd_imgs(settings):
     sub = settings["SUBREDDITS"][random.randint(0, len(settings["SUBREDDITS"]) - 1)]
-    url = 'https://old.reddit.com/r/' + sub.replace(' ', '') + "/"
     print("Grabbing from", sub)
-    sorting = settings["SORTING"]
-    if sorting == "TOP":
-        url += 'top/'
-    # url += '?limit=100'
-    print(url)
-
-    response = requests.get(url,
-                            headers={'User-agent': 'ImaginaryEscapism'})  # Required to be allowed to get reddit data
-    html_soup = BeautifulSoup(response.text, 'lxml')
-    containers = html_soup.find_all('div', class_="expando expando-uninitialized")
 
     bgs = []
-
-    for k in containers:  # Actually getting the url out of the container selected
-        k = str(k).split(" ")
-        for a in k:
-            if 'href' in a:
-                a = a[6:-1]
-                if a.split('.')[-1] in image_extensions:
-                    bg = background.Background(a, sub)
-                    bgs.append(bg)
+    reddit = praw.Reddit(client_id="R1QneAltTJA0aw",
+                         client_secret="",
+                         user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:78.0) Gecko/20100101 Firefox/78.0")
+    for submission in reddit.subreddit(sub).top(time_filter='all'):
+        bg = background.Background(submission.url, sub)
+        bgs.append(bg)
     return bgs
 
 
 def find_background(bgs):
     if len(bgs) <= 0:
         print("Could not find a background.")
-        return False
+        return None
     choice = bgs[random.randint(0, len(bgs) - 1)]
     choice.get_image_from_url()
+    recursive_count = 0
     if choice.is_image_duped(past_urls) or choice.is_ratio_invalid():
+        if recursive_count > 5:
+            return None
         find_background(bgs)
+        recursive_count += 1
     choice.save_image_to_file()
     past_urls.append(choice.site_url)
     return choice
@@ -80,6 +69,9 @@ def loop(loop_time_s):
     print('\nLooping\n')
     backgrounds = get_redd_imgs(settings)
     chosen_bg = find_background(backgrounds)
+    if not chosen_bg:
+        print('Could not find background. Trying again.')
+        loop(loop_time_s)
     b_changed = chosen_bg.change_background()
     if not b_changed:
         print("Could not change background. Trying again.")
@@ -96,7 +88,6 @@ def loop(loop_time_s):
     elif answer.lower() == 'f':
         print('Favouriting')
         chosen_bg.add_favourite()
-    print('Looping again\n')
     loop(loop_time_s)
 
 
