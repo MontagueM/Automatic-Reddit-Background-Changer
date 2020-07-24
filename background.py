@@ -33,7 +33,12 @@ class Background:
         """
         :return: the image content of the background
         """
-        response = requests.get(self.site_url)
+        try:
+            print(self.site_url)
+            response = requests.get(self.site_url)
+        except requests.exceptions.ConnectionError:
+            print("Response connection error.")
+            return False
         if response.status_code != 200:
             return False
 
@@ -60,11 +65,15 @@ class Background:
     def get_dimensions(self):
         if not self.image_content:
             self.get_image_from_url()
+            if not self.image_content:
+                return None
         self.dimensions = self.image_content.size
 
     def is_ratio_invalid(self):
         if not self.dimensions:
             self.get_dimensions()
+            if not self.dimensions:
+                return False
         width, height = self.dimensions
         # Some arbritrary aspect ratio requirement that is < 16/9 but > 1/1
         if width / height < 10/7:
