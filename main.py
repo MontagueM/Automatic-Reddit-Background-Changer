@@ -41,7 +41,7 @@ def get_redd_imgs(settings):
 
     bgs = []
     reddit = praw.Reddit(client_id="R1QneAltTJA0aw",
-                         client_secret="qn4uzfRkFkTgRB0SOk7oMYQRS9E",
+                         client_secret="",
                          user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:78.0) Gecko/20100101 Firefox/78.0")
     try:
         for submission in reddit.subreddit(sub).top(time_filter='all'):
