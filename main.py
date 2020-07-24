@@ -1,47 +1,106 @@
-import time
-import image_fetcher
-import bg_changer
+import background
+import random
+from threading import Timer
+import praw
+import prawcore.exceptions
 
-past_images = []
+past_urls = []
+image_extensions = ['jpg', 'jpeg', 'png', 'bmp']
 
 
-def load_defaults():
+def load_settings():
     """
-    Loads the defaults from file to be parsed by the program.
-    Defaults in form of [time_sleep, stop_default_message, subreddits, sorting_of_subreddits]
-    Returns the default settings in an array
+    Loads the settings from file to be parsed by the program.
+    Settings in form of [time_sleep, stop_default_message, subreddits, sorting_of_subreddits]
+    :return: array of these settings
     """
-    defaults_ret = []
-    with open('defaults.txt', 'r') as f:
+    settings = {}
+    with open('settings.ini', 'r') as f:
         lines = f.readlines()
         for line in lines:
             if '//' not in line and line != '\n':  # ignoring comments and blank lines
-                defaults_ret.append(line.split("=")[1].replace("\n", ""))  # getting the actual data we need
-        defaults_ret[2] = defaults_ret[2].split(',')  # splitting up the subreddits into a list instead of string
-    return defaults_ret
+                setting = line.split("=")
+                settings[setting[0]] = setting[1].replace("\n", "")  # getting the actual data we need
+        settings["SUBREDDITS"] = settings["SUBREDDITS"].split(',')  # splitting up the subreddits into a list instead of string
+        try:
+            settings["TIME_SLEEP"] = float(settings["TIME_SLEEP"]) * 60
+        except ValueError:
+            print(f'{settings["TIME_SLEEP"]} is not a valid float.')
+            return
+    return settings
 
 
-def cycle(sleep_time_str):
-    """
-    This function is the main script that is iterated upon forever until the program is closed.
-    """
-    past_image = image_fetcher.fetch_image(defaults[2], defaults[3], past_images)  # Gets image from reddit
-    past_images.append(past_image)  # Ensuring that we don't get duplicate images
-    bg_changer.change_bg()  # Changes background
-    sleep_time = int(sleep_time_str)*60  # Delay turned from mins to seconds
-
-    time.sleep(sleep_time)  # Sleeping for sleep_time seconds
+def try_ask_settings_msg(settings):
+    if settings["SHOW_SETTINGS_MESSAGE"] == "TRUE":  # If defaults message is set to TRUE (by default), show the message
+        input("Reminder to change settings.ini to desired settings. Change SHOW_SETTINGS_MESSAGE to disable this in the future (Enter to continue) ")
 
 
-defaults = load_defaults()
+def get_redd_imgs(settings):
+    sub = settings["SUBREDDITS"][random.randint(0, len(settings["SUBREDDITS"]) - 1)]
+    print("Grabbing from", sub)
 
-if defaults[1] == "TRUE":  # If defaults message is set to TRUE (by default), show the message
-    use_def = input("Change the settings in default.txt. To not see this message again press y, otherwise press enter: ").lower()
-    if use_def == 'y':
-        with open('defaults.txt', 'rw') as f:
-            lines = f.readlines()
-            lines = lines[3].replace('STOP_DEFAULTS_MESSAGE=FALSE', 'STOP_DEFAULTS_MESSAGE=TRUE')
-            f.write(lines)
+    bgs = []
+    reddit = praw.Reddit(client_id="R1QneAltTJA0aw",
+                         client_secret="",
+                         user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:78.0) Gecko/20100101 Firefox/78.0")
+    try:
+        for submission in reddit.subreddit(sub).top(time_filter='all'):
+            if submission:
+                bg = background.Background(submission.url, sub)
+                bgs.append(bg)
+    except prawcore.exceptions.ResponseException:
+        print("401 HTTP Timeout. Trying again.")
+        get_redd_imgs(settings)
+    return bgs
 
-while True:
-    cycle(defaults[0])
+
+def find_background(bgs):
+    if len(bgs) <= 0:
+        print("Could not find a background.")
+        return None
+    choice = bgs[random.randint(0, len(bgs) - 1)]
+    b_grabbed_image = choice.get_image_from_url()
+    recursive_count = 0
+    if choice.is_image_duped(past_urls) or choice.is_ratio_invalid() or not b_grabbed_image:
+        if recursive_count > 5:
+            return None
+        recursive_count += 1
+        find_background(bgs)
+    choice.save_image_to_file()
+    past_urls.append(choice.site_url)
+    return choice
+
+
+def loop(loop_time_s):
+    print('\nLooping\n')
+    backgrounds = get_redd_imgs(settings)
+    chosen_bg = find_background(backgrounds)
+    if not chosen_bg:
+        print('Could not find background. Trying again.')
+        loop(loop_time_s)
+    b_changed = chosen_bg.change_background()
+    if not b_changed:
+        print("Could not change background. Trying again.")
+        loop(loop_time_s)
+    # We want to be able to cancel this loop at any time from here by pressing enter (skip) or F (favourite)
+    t = Timer(loop_time_s, loop, [loop_time_s])
+    t.start()
+    prompt = "You have %d minute(s) to input an option (anything for skip, 'f' for favourite)...\n" % int(loop_time_s / 60)
+    answer = input(prompt)
+    t.cancel()
+    if answer.lower() == 's':
+        print('Skipping\n')
+        loop(loop_time_s)
+    elif answer.lower() == 'f':
+        print('Favouriting')
+        chosen_bg.add_favourite()
+    loop(loop_time_s)
+
+
+if __name__ == '__main__':
+    settings = load_settings()
+    try_ask_settings_msg(settings)
+    loop(settings["TIME_SLEEP"])
+
+
+# figure out why its being slow/freezing here and there
